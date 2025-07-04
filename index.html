@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <title>Registro de Tarefas</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React and ReactDOM CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body class="bg-gray-100 min-h-screen flex justify-center items-start px-2 py-4">
+    <div id="root" class="w-full max-w-md"></div>
+    <script type="text/babel">
+
+      const TASKS_KEY = 'tarefas-registradas-v1';
+
+      function getStoredTasks() {
+        try {
+          const data = localStorage.getItem(TASKS_KEY);
+          return data ? JSON.parse(data) : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function setStoredTasks(tasks) {
+        localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+      }
+
+      function downloadJSON(tasks) {
+        const blob = new Blob([JSON.stringify(tasks, null, 2)], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "tarefas.json";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 200);
+      }
+
+      function TaskForm({onAdd}) {
+        const [dia, setDia] = React.useState(() =>
+          new Date().toISOString().slice(0,10)
+        );
+        const [hora, setHora] = React.useState(() =>
+          new Date().toTimeString().slice(0,5)
+        );
+        const [titulo, setTitulo] = React.useState('');
+        const [descricao, setDescricao] = React.useState('');
+
+        const [erro, setErro] = React.useState('');
+
+        function submit(e) {
+          e.preventDefault();
+          setErro('');
+          if (!dia || !hora || !titulo.trim()) {
+            setErro('Preencha todos os campos obrigatórios.');
+            return;
+          }
+          onAdd({
+            id: Date.now() + '_' + Math.random().toString(36).slice(2),
+            dia,
+            hora,
+            titulo: titulo.trim(),
+            descricao: descricao.trim(),
+          });
+          setTitulo('');
+          setDescricao('');
+        }
+
+        return (
+          <form
+            onSubmit={submit}
+            className="bg-white rounded-lg shadow-md p-4 flex flex-col gap-3"
+          >
+            <div>
+              <label className="block text-sm font-semibold mb-1" htmlFor="dia">Dia*</label>
+              <input
+                type="date"
+                id="dia"
+                className="w-full p-2 border rounded focus:outline-none focus:ring focus:ring-blue-200"
+                value={dia}
+                onChange={e => setDia(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1" htmlFor="hora">Hora*</label>
+              <input
+                type="time"
+                id="hora"
+                className="w-full p-2 border rounded focus:outline-none focus:ring focus:ring-blue-200"
+                value={hora}
+                onChange={e => setHora(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1" htmlFor="titulo">Título*</label>
+              <input
+                type="text"
+                id="titulo"
+                className="w-full p-2 border rounded focus:outline-none focus:ring focus:ring-blue-200"
+                value={titulo}
+                onChange={e => setTitulo(e.target.value)}
+                required
+                placeholder="Ex: Revisar código"
+                maxLength={100}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1" htmlFor="descricao">Descrição</label>
+              <textarea
+                id="descricao"
+                className="w-full p-2 border rounded focus:outline-none focus:ring focus:ring-blue-200"
+                value={descricao}
+                onChange={e => setDescricao(e.target.value)}
+                placeholder="(Opcional)"
+                maxLength={500}
+                rows={2}
+              ></textarea>
+            </div>
+            {erro &&
+              <div className="text-red-500 text-sm">{erro}</div>
+            }
+            <button
+              type="submit"
+              className="mt-2 bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 active:bg-blue-800 transition"
+            >
+              Salvar tarefa
+            </button>
+          </form>
+        );
+      }
+
+      function TaskList({tasks, onDelete}) {
+        if (!tasks.length) {
+          return (
+            <div className="mt-4 text-center text-gray-400">
+              Nenhuma tarefa registrada.
+            </div>
+          );
+        }
+        // Ordena por data/hora desc
+        const sorted = [...tasks].sort((a, b) =>
+          (b.dia + b.hora).localeCompare(a.dia + a.hora)
+        );
+        return (
+          <ul className="mt-4 space-y-3">
+            {sorted.map(task => (
+              <li key={task.id} className="bg-white rounded shadow p-3 flex flex-col sm:flex-row sm:items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-blue-700 text-md truncate">{task.titulo}</div>
+                  <div className="text-xs text-gray-500">{task.dia} às {task.hora}</div>
+                  {task.descricao &&
+                    <div className="text-sm text-gray-700 mt-1 break-words">
+                      {task.descricao}
+                    </div>
+                  }
+                </div>
+                <button
+                  className="mt-2 sm:mt-0 sm:ml-4 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 active:bg-red-700 transition flex-shrink-0 text-xs"
+                  onClick={() => onDelete(task.id)}
+                  title="Excluir tarefa"
+                >
+                  Excluir
+                </button>
+              </li>
+            ))}
+          </ul>
+        );
+      }
+
+      function App() {
+        const [tasks, setTasks] = React.useState(getStoredTasks);
+
+        React.useEffect(() => {
+          setStoredTasks(tasks);
+        }, [tasks]);
+
+        function addTask(task) {
+          setTasks(prev => [task, ...prev]);
+        }
+
+        function deleteTask(id) {
+          setTasks(prev => prev.filter(t => t.id !== id));
+        }
+
+        function baixarJSON() {
+          downloadJSON(tasks);
+        }
+
+        return (
+          <div className="w-full">
+            <h1 className="text-2xl font-bold text-center mb-4 text-blue-700">Registro de Tarefas</h1>
+            <TaskForm onAdd={addTask} />
+            <div className="flex justify-end mt-3">
+              <button
+                onClick={baixarJSON}
+                className="bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700 active:bg-green-800 text-sm"
+              >
+                Baixar JSON
+              </button>
+            </div>
+            <TaskList tasks={tasks} onDelete={deleteTask} />
+            <footer className="mt-8 text-gray-400 text-xs text-center">
+              Desenvolvido com React e Tailwind CSS
+            </footer>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>
